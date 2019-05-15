@@ -9,12 +9,16 @@ import {
   Operational,
   Cell,
   CellLoop,
-  getTotalRegistrations
+  getTotalRegistrations,
+  Vertex
 } from '../../lib/Lib';
 
 afterEach(() => {
   if (getTotalRegistrations() != 0) {
     throw new Error('listeners were not deregistered');
+  }
+  if (!Vertex.integrityCheck()) {
+    throw new Error('Vertex integrity check failed!');
   }
 });
 

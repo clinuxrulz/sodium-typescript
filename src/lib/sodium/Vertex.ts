@@ -154,7 +154,41 @@ export class Vertex {
             str = str + " " + chs[i].id;
         }
         return str;
-	}
+    }
+
+    static integrityCheck(): boolean {
+        let visited: Set<number> = new Set();
+        let stack: Vertex[] = [Vertex.NULL];
+        while (stack.length != 0) {
+            let vertex = stack.pop();
+            if (visited.contains(vertex.id)) {
+                continue;
+            }
+            visited.add(vertex.id);
+            // each target of vertex must have this vertex as a child.
+            for (let i = 0; i < vertex.targets.length; ++i) {
+                let target = vertex.targets[i];
+                let found = false;
+                for (let j = 0; j < target.childrn.length; ++i) {
+                    let child = target.childrn[j];
+                    if (child === vertex) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    return false;
+                }
+            }
+            // recurse into targets
+            for (let i = 0; i < vertex.targets.length; ++i) {
+                let target = vertex.targets[i];
+                stack.push(target);
+            }
+        }
+        return true;
+    
+    }
 
 	// --------------------------------------------------------
 	// Synchronous Cycle Collection algorithm presented in "Concurrent
