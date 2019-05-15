@@ -169,7 +169,7 @@ export class Vertex {
             for (let i = 0; i < vertex.childrn.length; ++i) {
                 let child = vertex.childrn[i];
                 let found = false;
-                for (let j = 0; j < child.targets.length; ++i) {
+                for (let j = 0; j < child.targets.length; ++j) {
                     let target = child.targets[j];
                     if (target === vertex) {
                         found = true;
