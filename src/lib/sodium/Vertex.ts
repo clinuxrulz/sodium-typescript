@@ -165,13 +165,13 @@ export class Vertex {
                 continue;
             }
             visited.add(vertex.id);
-            // each target of vertex must have this vertex as a child.
-            for (let i = 0; i < vertex.targets.length; ++i) {
-                let target = vertex.targets[i];
+            // each child of vertex must have this vertex as a target.
+            for (let i = 0; i < vertex.childrn.length; ++i) {
+                let child = vertex.childrn[i];
                 let found = false;
-                for (let j = 0; j < target.childrn.length; ++i) {
-                    let child = target.childrn[j];
-                    if (child === vertex) {
+                for (let j = 0; j < child.targets.length; ++i) {
+                    let target = child.targets[j];
+                    if (target === vertex) {
                         found = true;
                         break;
                     }
@@ -180,10 +180,10 @@ export class Vertex {
                     return false;
                 }
             }
-            // recurse into targets
-            for (let i = 0; i < vertex.targets.length; ++i) {
-                let target = vertex.targets[i];
-                stack.push(target);
+            // recurse into children
+            for (let i = 0; i < vertex.childrn.length; ++i) {
+                let child = vertex.childrn[i];
+                stack.push(child);
             }
         }
         return true;
