@@ -12,7 +12,6 @@ import {
 
 const timeout: number = 30000;
 
-/*
 test('should test Timer', (done) => {
   function periodic(sys: TimerSystem, period: number) {
     const time = sys.time,
@@ -63,4 +62,3 @@ test('should test Timer', (done) => {
 
   expect(typeof ticker).toBe('function');
 }, timeout);
-*/

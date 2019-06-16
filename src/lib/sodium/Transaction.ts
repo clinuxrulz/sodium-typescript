@@ -10,7 +10,23 @@ export class Action
   visited: boolean = false;
 }
 
-export class Entry
+export interface EntryKey {
+  rank_(): number;
+}
+
+export class EntryKeyInst {
+  constructor(rank: number) {
+    this.rank = rank;
+  }
+
+  rank: number;
+
+  rank_(): number {
+    return this.rank;
+  }
+}
+
+export class Entry implements EntryKey
 {
   constructor(rank: Vertex, actions: Collections.Dictionary<Vertex,Action[]>)
   {
@@ -20,6 +36,10 @@ export class Entry
 
   rank: Vertex;
   actions: Collections.Dictionary<Vertex,Action[]>;
+
+  rank_(): number {
+    return this.rank.rank;
+  }
 
   toString(): string
   {
@@ -38,7 +58,7 @@ export class Transaction
   inCallback: number = 0;
 
   prioritizedMinIdx = -1;
-  prioritizedQ: Entry[] = [];
+  prioritizedQ: Collections.BSTreeKV<EntryKey,Entry> = new Collections.BSTreeKV((a,b) => a.rank_() - b.rank_());
   private sampleQ: Array<() => void> = [];
   private lastQ: Array<() => void> = [];
   private postQ: Array<() => void> = null;
@@ -53,11 +73,11 @@ export class Transaction
         this.prioritizedMinIdx = target.rank;
       }
     }
-    let entry = this.prioritizedQ[target.rank];
+    let entry = this.prioritizedQ.search(new EntryKeyInst(target.rank));
     if (entry == undefined) {
       let actions = new Collections.Dictionary<Vertex,Action[]>(k => "" + k.id);
       entry = new Entry(target, actions);
-      this.prioritizedQ[target.rank] = entry;
+      this.prioritizedQ.add(entry);
     }
     let actions = entry.actions.getValue(target);
     if (actions == undefined) {
@@ -112,37 +132,32 @@ export class Transaction
   {
     while(true)
     {
-      if (this.prioritizedMinIdx != -1) {
-        for (let i = this.prioritizedMinIdx; i < this.prioritizedQ.length; ++i) {
-          let entry = this.prioritizedQ[i];
-          if (entry == undefined) {
-            continue;
-          }
-          while (true) {
-            let keys = entry.actions.keys();
-            if (keys.length == 0) {
-              break;
-            }
-            let key = keys[0];
-            let actions = entry.actions.remove(key);
-            if (actions == undefined) {
+      if (this.prioritizedQ.isEmpty()) {
+        break;
+      }
+      let entry = this.prioritizedQ.minimum();
+      this.prioritizedQ.remove(entry);
+      while (true) {
+        let keys = entry.actions.keys();
+        if (keys.length == 0) {
+          break;
+        }
+        let key = keys[0];
+        let actions = entry.actions.remove(key);
+        if (actions == undefined) {
+          continue;
+        }
+        for (let k = actions.length-1; k >= 0; --k) {
+          // Actions may be removed during the execution of actions, so add an if-statement for safety.
+          if (k < actions.length) {
+            let action = actions.splice(k, 1)[0];
+            if (action.visited) {
               continue;
             }
-            for (let k = actions.length-1; k >= 0; --k) {
-              // Actions may be removed during the execution of actions, so add an if-statement for safety.
-              if (k < actions.length) {
-                let action = actions.splice(k, 1)[0];
-                if (action.visited) {
-                  continue;
-                }
-                action.visited = true;
-                action.action();
-              }
-            }
+            action.visited = true;
+            action.action();
           }
         }
-        this.prioritizedMinIdx = -1;
-        this.prioritizedQ.splice(0, this.prioritizedQ.length);
       }
 
       const sq = this.sampleQ;
@@ -150,7 +165,7 @@ export class Transaction
       for (let i = 0; i < sq.length; i++)
         sq[i]();
 
-      if(this.prioritizedQ.length < 1 && this.sampleQ.length < 1) break;
+      if(this.prioritizedQ.isEmpty() && this.sampleQ.length < 1) break;
     }
 
     for (let i = 0; i < this.lastQ.length; i++)
