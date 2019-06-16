@@ -1,23 +1,29 @@
 import {Vertex} from './Vertex';
 import * as Collections from 'typescript-collections';
 
+export class Action
+{
+  constructor(action: ()=>void) {
+    this.action = action;
+  }
+  action: ()=>void;
+  visited: boolean = false;
+}
+
 export class Entry
 {
-  constructor(rank: Vertex, action: () => void)
+  constructor(rank: Vertex, actions: Collections.Dictionary<Vertex,Action[]>)
   {
     this.rank = rank;
-    this.action = action;
-    this.seq = Entry.nextSeq++;
+    this.actions = actions;
   }
 
-  private static nextSeq: number = 0;
   rank: Vertex;
-  action: () => void;
-  seq: number;
+  actions: Collections.Dictionary<Vertex,Action[]>;
 
   toString(): string
   {
-    return this.seq.toString();
+    return "" + this.rank.rank;
   }
 }
 
@@ -30,24 +36,9 @@ export class Transaction
   constructor() {}
 
   inCallback: number = 0;
-  private toRegen: boolean = false;
 
-  requestRegen(): void
-  {
-    this.toRegen = true;
-  }
-
-  prioritizedQ: Collections.PriorityQueue<Entry> = new Collections.PriorityQueue<Entry>((a, b) =>
-  {
-    // Note: Low priority numbers are treated as "greater" according to this
-    // comparison, so that the lowest numbers are highest priority and go first.
-    if (a.rank.rank < b.rank.rank) return 1;
-    if (a.rank.rank > b.rank.rank) return -1;
-    if (a.seq < b.seq) return 1;
-    if (a.seq > b.seq) return -1;
-    return 0;
-  });
-  private entries: Collections.Set<Entry> = new Collections.Set<Entry>((a) => a.toString());
+  prioritizedMinIdx = -1;
+  prioritizedQ: Entry[] = [];
   private sampleQ: Array<() => void> = [];
   private lastQ: Array<() => void> = [];
   private postQ: Array<() => void> = null;
@@ -55,9 +46,25 @@ export class Transaction
 
   prioritized(target: Vertex, action: () => void): void
   {
-    const e = new Entry(target, action);
-    this.prioritizedQ.enqueue(e);
-    this.entries.add(e);
+    if (this.prioritizedMinIdx == -1) {
+      this.prioritizedMinIdx = target.rank;
+    } else {
+      if (target.rank < this.prioritizedMinIdx) {
+        this.prioritizedMinIdx = target.rank;
+      }
+    }
+    let entry = this.prioritizedQ[target.rank];
+    if (entry == undefined) {
+      let actions = new Collections.Dictionary<Vertex,Action[]>(k => "" + k.id);
+      entry = new Entry(target, actions);
+      this.prioritizedQ[target.rank] = entry;
+    }
+    let actions = entry.actions.getValue(target);
+    if (actions == undefined) {
+      actions = [];
+      entry.actions.setValue(target, actions);
+    }
+    actions.push(new Action(action));
   }
 
   sample(h: () => void): void
@@ -96,20 +103,6 @@ export class Transaction
     this.postQ[childIx] = neu;
   }
 
-  // If the priority queue has entries in it when we modify any of the nodes'
-  // ranks, then we need to re-generate it to make sure it's up-to-date.
-  private checkRegen(): void
-  {
-    if (this.toRegen)
-    {
-      this.toRegen = false;
-      this.prioritizedQ.clear();
-      const es = this.entries.toArray();
-      for (let i: number = 0; i < es.length; i++)
-        this.prioritizedQ.enqueue(es[i]);
-    }
-  }
-
   public isActive() : boolean
   {
     return Transaction.currentTransaction ? true : false;
@@ -119,13 +112,37 @@ export class Transaction
   {
     while(true)
     {
-      while (true)
-      {
-        this.checkRegen();
-        if (this.prioritizedQ.isEmpty()) break;
-        const e = this.prioritizedQ.dequeue();
-        this.entries.remove(e);
-        e.action();
+      if (this.prioritizedMinIdx != -1) {
+        for (let i = this.prioritizedMinIdx; i < this.prioritizedQ.length; ++i) {
+          let entry = this.prioritizedQ[i];
+          if (entry == undefined) {
+            continue;
+          }
+          while (true) {
+            let keys = entry.actions.keys();
+            if (keys.length == 0) {
+              break;
+            }
+            let key = keys[0];
+            let actions = entry.actions.remove(key);
+            if (actions == undefined) {
+              continue;
+            }
+            for (let k = actions.length-1; k >= 0; --k) {
+              // Actions may be removed during the execution of actions, so add an if-statement for safety.
+              if (k < actions.length) {
+                let action = actions.splice(k, 1)[0];
+                if (action.visited) {
+                  continue;
+                }
+                action.visited = true;
+                action.action();
+              }
+            }
+          }
+        }
+        this.prioritizedMinIdx = -1;
+        this.prioritizedQ.splice(0, this.prioritizedQ.length);
       }
 
       const sq = this.sampleQ;
@@ -133,7 +150,7 @@ export class Transaction
       for (let i = 0; i < sq.length; i++)
         sq[i]();
 
-      if(this.prioritizedQ.isEmpty() && this.sampleQ.length < 1) break;
+      if(this.prioritizedQ.length < 1 && this.sampleQ.length < 1) break;
     }
 
     for (let i = 0; i < this.lastQ.length; i++)

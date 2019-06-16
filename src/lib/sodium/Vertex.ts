@@ -1,4 +1,4 @@
-import { Transaction } from "./Transaction";
+import { Transaction, Action } from "./Transaction";
 import { Set } from "typescript-collections";
 
 let totalRegistrations : number = 0;
@@ -96,8 +96,8 @@ export class Vertex {
     childrn : Vertex[] = [];
     refCount() : number { return this.targets.length; };
     visited : boolean = false;
-    register(target : Vertex) : boolean {
-        return this.increment(target);
+    register(target : Vertex) {
+        this.increment(target);
     }
     deregister(target : Vertex) : void {
         if (verbose)
@@ -105,18 +105,15 @@ export class Vertex {
         this.decrement(target);
         Transaction._collectCyclesAtEnd();
     }
-    private incRefCount(target : Vertex) : boolean {
-        let anyChanged : boolean = false;
+    private incRefCount(target : Vertex) : void {
         if (this.refCount() == 0) {
             for (let i = 0; i < this.sources.length; i++)
                 this.sources[i].register(this);
         }
         this.targets.push(target);
         target.childrn.push(this);
-        if (target.ensureBiggerThan(this.rank))
-            anyChanged = true;
+        target.ensureBiggerThan(this.rank);
         totalRegistrations++;
-        return anyChanged;
     }
 
     private decRefCount(target : Vertex) : void {
@@ -149,17 +146,31 @@ export class Vertex {
             src.register(this);
     }
 
-	private ensureBiggerThan(limit : number) : boolean {
+	private ensureBiggerThan(limit : number) {
         if (this.visited) {
             // Undoing cycle detection for now until TimerSystem.ts ranks are checked.
             //throw new Error("Vertex cycle detected.");
             return false;
         }
 		if (this.rank > limit)
-			return false;
+			return;
 
         this.visited = true;
-		this.rank = limit + 1;
+        let actionsToReinsertIntoPQ: Action[] = [];
+        { // Fix the entry in the priority queue.
+            let entry = Transaction.currentTransaction.prioritizedQ[this.rank];
+            if (entry != undefined) {
+                actionsToReinsertIntoPQ = entry.actions.remove(this) || [];
+            }
+        }
+        this.rank = limit + 1;
+        // Reinsert any removed actions into priority queue
+        if (actionsToReinsertIntoPQ.length != 0) {
+            for (let i = 0; i < actionsToReinsertIntoPQ.length; ++i) {
+                let action = actionsToReinsertIntoPQ[i];
+                Transaction.currentTransaction.prioritized(this, action.action);
+            }
+        }
 		for (let i = 0; i < this.targets.length; i++)
 			this.targets[i].ensureBiggerThan(this.rank);
         this.visited = false;
@@ -193,8 +204,8 @@ export class Vertex {
 
 	children() : Vertex[] { return this.childrn; }
 
-	increment(referrer : Vertex) : boolean {
-	    return this.incRefCount(referrer);
+	increment(referrer : Vertex) {
+	    this.incRefCount(referrer);
 	}
 
 	decrement(referrer : Vertex) : void {
