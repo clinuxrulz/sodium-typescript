@@ -147,16 +147,13 @@ export class Transaction
         if (actions == undefined) {
           continue;
         }
-        for (let k = actions.length-1; k >= 0; --k) {
-          // Actions may be removed during the execution of actions, so add an if-statement for safety.
-          if (k < actions.length) {
-            let action = actions.splice(k, 1)[0];
-            if (action.visited) {
-              continue;
-            }
-            action.visited = true;
-            action.action();
+        while (actions.length != 0) {
+          let action = actions.splice(0, 1)[0];
+          if (action.visited) {
+            continue;
           }
+          action.visited = true;
+          action.action();
         }
       }
 

@@ -1,4 +1,4 @@
-import { Transaction, Action } from "./Transaction";
+import { Transaction, Action, EntryKeyInst } from "./Transaction";
 import { Set } from "typescript-collections";
 
 let totalRegistrations : number = 0;
@@ -158,7 +158,7 @@ export class Vertex {
         this.visited = true;
         let actionsToReinsertIntoPQ: Action[] = [];
         { // Fix the entry in the priority queue.
-            let entry = Transaction.currentTransaction.prioritizedQ[this.rank];
+            let entry = Transaction.currentTransaction.prioritizedQ.search(new EntryKeyInst(this.rank));
             if (entry != undefined) {
                 actionsToReinsertIntoPQ = entry.actions.remove(this) || [];
             }
