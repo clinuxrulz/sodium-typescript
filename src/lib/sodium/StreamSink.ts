@@ -1,6 +1,7 @@
 import { Stream } from "./Stream";
 import { Transaction } from "./Transaction";
 import { StreamVertex, StreamSinkVertex } from './Vertex';
+import { GcNode } from "./GcNode";
 
 /**
  * A stream that allows values to be pushed into it, acting as an interface between the
@@ -9,7 +10,15 @@ import { StreamVertex, StreamSinkVertex } from './Vertex';
  */
 export class StreamSink<A> extends Stream<A> {
     constructor(f?: (l: A, r: A) => A) {
-        super(new StreamSinkVertex());
+        super(
+            new StreamSinkVertex(
+                new GcNode(
+                    () => {},
+                    () => {},
+                    _tracer => {}
+                )
+            )
+        );
     }
 
     send(a: A): void {
