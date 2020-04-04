@@ -57,15 +57,36 @@ class Snapshot4Vertex<A, B, C, D, E> extends StreamVertex<E> {
         cd: CellVertex<D>,
         f: (a: A, b: B, c: C, d: D) => E,
     ) {
-        super();
+        super(
+            new GcNode(
+                () => {
+                    sa.incRef();
+                    cb.incRef();
+                    cc.incRef();
+                    cd.incRef();
+                    sa.addDependent(this);
+                },
+                () => {
+                    sa.removeDependent(this);
+                    sa.decRef();
+                    cb.decRef();
+                    cc.decRef();
+                    cd.decRef();
+                },
+                tracer => {
+                    tracer(sa.gcNode);
+                    tracer(cb.gcNode);
+                    tracer(cc.gcNode);
+                    tracer(cd.gcNode);
+                }
+            )
+        );
 
         this.f = f;
         this.sa = sa;
         this.cb = cb;
         this.cc = cc;
         this.cd = cd;
-
-        sa.addDependent(this);
     }
 
     private readonly sa: StreamVertex<A>;
