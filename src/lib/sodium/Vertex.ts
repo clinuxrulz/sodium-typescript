@@ -1,4 +1,5 @@
 import { Transaction } from "./Transaction";
+import { GcNode } from "./GcNode";
 
 let totalRegistrations: number = 0;
 export function getTotalRegistrations(): number {
@@ -11,6 +12,12 @@ export abstract class Vertex {
     readonly dependents?: Set<Vertex>;
 
     visited = false;
+
+    readonly gcNode: GcNode;
+
+    constructor(gcNode: GcNode) {
+        this.gcNode = gcNode;
+    }
 
     reset(): void { // TODO: remove?
         this.visited = false;
@@ -78,6 +85,10 @@ export class StreamVertex<A> extends Vertex {
         this.dependents.add(vertex);
     }
 
+    removeDependent(vertex: Vertex): void {
+        this.dependents.delete(vertex);
+    }
+
     describe_(): string {
         return `, processed: ${this.processed}, new: ${this.newValue}`;
     }
@@ -103,8 +114,8 @@ export class CellVertex<A> extends StreamVertex<A> {
         return this._oldValue;
     }
 
-    constructor(initValue?: A, newValue?: A) {
-        super();
+    constructor(gcNode: GcNode, initValue?: A, newValue?: A) {
+        super(gcNode);
         this._oldValue = initValue;
         this._newValue = newValue;
     }
@@ -135,7 +146,10 @@ export class CellSinkVertex<A> extends CellVertex<A> {
 
 export class ConstCellVertex<A> extends CellVertex<A> {
     constructor(initValue: A) {
-        super(initValue);
+        super(
+            new GcNode(() => {}, () => {}, _tracer => {}),
+            initValue
+        );
         this.processed = true;
     }
 
@@ -160,12 +174,20 @@ export class ListenerVertex<A> extends Vertex {
         source: StreamVertex<A>,
         h: (a: A) => void,
     ) {
-        super();
+        super(
+            new GcNode(
+                () => {
+                    source.addDependent(this);
+                },
+                () => {
+                    source.removeDependent(this);
+                },
+                tracer => tracer(source.gcNode)
+            )
+        );
 
         this.source = source;
         this.h = h;
-
-        source.addDependent(this);
     }
 
     notify(): void {
