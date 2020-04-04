@@ -4,6 +4,7 @@ import { Cell } from "./Cell";
 import { Tuple2 } from "./Tuple2";
 import { Lazy } from "./Lazy";
 import { CellLoop } from "./CellLoop";
+import { GcNode } from "./GcNode";
 
 class SnapshotVertex<A, B, C> extends StreamVertex<C> {
     constructor(
@@ -496,7 +497,13 @@ export class StreamLoopVertex<A> extends StreamVertex<A> {
     private source?: StreamVertex<A>;
 
     constructor() {
-        super();
+        super(
+            new GcNode(
+                () => {},
+                () => {},
+                tracer => tracer(this.source.gcNode)
+            )
+        );
     }
 
     buildNewValue(): A | undefined {

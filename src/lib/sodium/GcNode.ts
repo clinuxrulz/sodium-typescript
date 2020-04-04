@@ -39,6 +39,18 @@ export class GcNode {
         this._trace = trace;
     }
 
+    public get params(): {
+        constructor_: ()=>void,
+        destructor: ()=>void,
+        trace: Trace
+    } {
+        return {
+            constructor_: this._constructor,
+            destructor: this._destructor,
+            trace: this.trace
+        }
+    }
+
     public incRef(): void {
         ++this.refCount;
         if (this.refCount == 1) {

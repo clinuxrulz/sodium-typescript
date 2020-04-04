@@ -16,7 +16,26 @@ export abstract class Vertex {
     readonly gcNode: GcNode;
 
     constructor(gcNode: GcNode) {
-        this.gcNode = gcNode;
+        this.gcNode =
+            new GcNode(
+                () => {
+                    (gcNode.params.constructor_)();
+                    totalRegistrations++;
+                },
+                () => {
+                    (gcNode.params.destructor)();
+                    totalRegistrations--;
+                },
+                gcNode.params.trace
+            );
+    }
+
+    incRef(): void {
+        this.gcNode.incRef();
+    }
+
+    decRef(): void {
+        this.gcNode.decRef();
     }
 
     reset(): void { // TODO: remove?
@@ -177,10 +196,12 @@ export class ListenerVertex<A> extends Vertex {
         super(
             new GcNode(
                 () => {
+                    source.incRef();
                     source.addDependent(this);
                 },
                 () => {
                     source.removeDependent(this);
+                    source.decRef();
                 },
                 tracer => tracer(source.gcNode)
             )
