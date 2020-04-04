@@ -117,11 +117,22 @@ export class HoldVertex<A> extends CellVertex<A> {
         initValue: A,
         steps: StreamVertex<A>,
     ) {
-        super(initValue);
+        super(
+            new GcNode(
+                () => {
+                    steps.incRef();
+                    steps.addDependent(this);
+                },
+                () => {
+                    steps.removeDependent(this);
+                    steps.decRef();
+                },
+                tracer => tracer(steps.gcNode)
+            ),
+            initValue
+        );
 
         this.steps = steps;
-
-        steps.addDependent(this);
     }
 
     private readonly steps: StreamVertex<A>;
